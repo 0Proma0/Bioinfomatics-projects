@@ -1,0 +1,118 @@
+---
+title: "Hardy-Weinberg test for every population "
+author: "Makar Dorohuntsev"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,warning = FALSE)
+```
+
+### 1. Create population divided genind from VCF file
+
+Read previously filtered VCF file to R and select most frequent SNP per marker. Next create genind with set populations and group them using seppop() to make list of geninds by populations.
+
+```{r}
+library(vcfR)
+library(adegenet)
+library(pegas)
+library(dplyr)
+# load file with population names 
+load("~/Library/CloudStorage/Dropbox/Salamandra project/sorted_BAM/pop name.RData")
+# snps - Large vcfR data file
+load("~/Library/CloudStorage/Dropbox/Salamandra project/sorted_BAM/SNP names.RData")
+load("~/Desktop/Data do projektu/Data/id by mafs.RData")
+snps <- vcfR::read.vcfR("~/Library/CloudStorage/Dropbox/Salamandra project/sorted_BAM/final.vcf", convertNA  = TRUE)
+# read row snps from vcf file, transpose and create loci 
+row_vcf <- as.loci(t(vcfR::extract.gt(snps, 
+                             element = "GT",
+                             IDtoRowNames  = T,
+                             as.numeric = F,
+                             convertNA = F,
+                             return.alleles = T)))
+#filter loci 
+filtred_loci <- row_vcf %>% select(c(unlist(filtred_id)))
+colnames(filtred_loci) <- c(unlist(filtred_id))
+# convert loci to genind
+test_genind <- loci2genind(filtred_loci)
+# add population data to genind
+test_genind@pop <- as.factor(c(a))
+# check percent of missing data 
+summary(test_genind)[5]
+separated_genind <- seppop(test_genind)
+```
+
+### 2. Using hw.test() function on each population
+
+For every population genind do Hardy-Weinberg test and filter out valued at zero.
+
+```{r}
+library(ggplot2)
+# separated_genind - list of geninds containing each population
+
+# make hw tests as data frames
+
+hw_pop_1_j <- as.data.frame(hw.test(separated_genind$`1-j`))
+hw_pop_10_j <- as.data.frame(hw.test(separated_genind$`10-j`))
+hw_pop_13_w <- as.data.frame(hw.test(separated_genind$`13-w`))
+hw_pop_15_j <- as.data.frame(hw.test(separated_genind$`15-j`))
+hw_pop_2_j <- as.data.frame(hw.test(separated_genind$`2-j`))
+hw_pop_2_w <- as.data.frame(hw.test(separated_genind$`2-w`))
+hw_pop_4_w <- as.data.frame(hw.test(separated_genind$`4-w`))
+hw_pop_5_j <- as.data.frame(hw.test(separated_genind$`5-j`))
+hw_pop_5_w <- as.data.frame(hw.test(separated_genind$`5-w`))
+hw_pop_9_j <- as.data.frame(hw.test(separated_genind$`9-j`))
+hw_pop_9_w <- as.data.frame(hw.test(separated_genind$`9-w`))
+
+# filter data frames to remove 0 values
+
+no_zeros_pop_1_j <- hw_pop_1_j %>%
+  filter(`chi^2` != (`chi^2`>0))
+no_zeros_pop_10_j <- hw_pop_10_j %>%
+  filter(`chi^2` != (`chi^2`>0))
+no_zeros_pop_13_j <- hw_pop_13_w %>%
+  filter(`chi^2` != (`chi^2`>0))
+no_zeros_pop_15_j <- hw_pop_15_j %>%
+  filter(`chi^2` != (`chi^2`>0))
+no_zeros_pop_2_j <- hw_pop_2_j %>%
+  filter(`chi^2` != (`chi^2`>0))
+no_zeros_pop_2_w <- hw_pop_2_w %>%
+  filter(`chi^2` != (`chi^2`>0))
+no_zeros_pop_4_w <- hw_pop_4_w %>%
+  filter(`chi^2` != (`chi^2`>0))
+no_zeros_pop_5_j <- hw_pop_5_j %>%
+  filter(`chi^2` != (`chi^2`>0))
+no_zeros_pop_5_w <- hw_pop_5_w %>%
+  filter(`chi^2` != (`chi^2`>0))
+no_zeros_pop_9_j <- hw_pop_9_j %>%
+  filter(`chi^2` != (`chi^2`>0))
+no_zeros_pop_9_w <- hw_pop_9_w %>%
+  filter(`chi^2` != (`chi^2`>0))
+
+# look how many usefull markers each population have
+
+poz_mark <- as.data.frame(c(nrow(no_zeros_pop_1_j),
+nrow(no_zeros_pop_10_j),
+nrow(no_zeros_pop_13_j),
+nrow(no_zeros_pop_15_j),
+nrow(no_zeros_pop_2_j),
+nrow(no_zeros_pop_2_w),
+nrow(no_zeros_pop_4_w),
+nrow(no_zeros_pop_5_j),
+nrow(no_zeros_pop_5_w),
+nrow(no_zeros_pop_9_j),
+nrow(no_zeros_pop_9_w)))
+colnames(poz_mark) <- c("mark count")
+
+```
+
+With that we can now see how many markers are giving us useful data and can plot it to see distribution and mean value
+
+```{r}
+ggplot(poz_mark, aes(x=`mark count`)) + 
+  geom_histogram( colour="black", fill="white",bins = 20)+
+  labs(x="Number of useful markers",y="Number of populations")+ 
+  geom_vline(aes(xintercept=mean(`mark count`)),
+            color="blue", linetype="dashed", size=1)
+```

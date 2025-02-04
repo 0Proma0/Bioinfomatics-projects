@@ -1,0 +1,104 @@
+---
+title: "Data preparation and project steps"
+author: "Makar Dorohuntsev"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE,eval = FALSE)
+```
+
+## A. Data preparation
+
+Note : bash commands were done in environment set by Anaconda-Navigator with added tool sets like fastqc or samtools
+
+#### At the start we have :
+
+-   574 fastq.gz files paired by name.R1 and name.R2
+
+-   folder with 6 reference files for mapping
+
+### 1. Create folder "unsorted_BAM" and do :
+
+```{bash}
+for s in $(ls *fastq.gz | cut -f1 -d'_' | sort | uniq)             
+    do
+        L=$(ls "$s"_*R1*)
+        R=$(ls "$s"_*R2*)
+        cd -
+        bowtie2 -x index/All_475_refs -1 Fastq\ zip/$L -2 Fastq\ zip/$R -S mapped/"$s"_001.sam
+		    cd mapped/
+		    samtools view -S -b $s_001.sam > $s_001.bam 
+		    cd -
+        cd Fastq\ zip/
+    done
+```
+
+### 2. Now create "sorted_BAM" and do :
+
+```{bash}
+for s in $(ls *.bam) 
+do
+        E=$(ls "$s")
+        samtools sort $E -o sorted.$E  
+done
+```
+
+### 3. Combine data from BAMs to one txt file :
+
+```{bash}
+for s in $(ls *.bam) 
+do
+        E=$(ls "$s"|cut -f 1,2 -d'.')
+                samtools idxstats $E.bam | awk -v a=$E ‘!/*/‘ ’{print a,$1,$3}' >> data.txt
+
+done
+```
+
+### 4. Remove \* from txt file :
+
+```{bash}
+Y=*
+sed -in-place /$Y/d ./data.txt
+```
+
+### 5. Create E.txt which contains names of all sorted BAM files and then create VCF from sorted BAM files and E.txt :
+
+note: all_457_refs.fas is final combined reference file for mpileup
+
+```{bash}
+bcftools mpileup -a FORMAT/DP -f all_457_refs.fas -d 5000 -Ov -o pileup.vcf -b E.txt
+
+```
+
+### 6. Do call on new VCF :
+
+```{bash}
+bcftools call -mv -Ov -o call.vcf pileup.vcf
+```
+
+### 7. Filter VCF by DP and QUAL :
+
+```{bash}
+bcftools filter -Ov -i 'FORMAT/DP>=8||GQ>=20' -o filter.vcf call.vcf   
+
+```
+
+### 8. Do a second filter by F_MISSING :
+
+```{bash}
+ bcftools filter -Ov -i 'F_MISSING<0.5' -o final.vcf filter.vcf
+```
+
+## B. Data analysis steps
+
+1\. [Allelic frequencies for further analyses](file:///Users/makardorohuntsev/Desktop/Data%20do%20projektu/1/Allele-Freq-for-every-pop.html)
+
+2\. [Calculated Hardy-Weinberg tests for each SNP in each population which gives us list of useful SNPs](file:///Users/makardorohuntsev/Desktop/Data%20do%20projektu/5/Hw-test.html)
+
+3\. [PCA plot by population with color marking to see if there are any outline population groups](file:///Users/makardorohuntsev/Desktop/Data%20do%20projektu/3/PCA-and-MAF.html)
+
+4\. [Calculated pairwise Fst between all pairs of populations (considering temporal samples as separate) and visualised as multidimiensional scaling](file:///Users/makardorohuntsev/Desktop/Data%20do%20projektu/4/Fst-with-plot.html)
+
+5. [Computed allelic frequency difference for populations between seasons divided by the average allele frequency](file:///Users/makardorohuntsev/Desktop/Data%20do%20projektu/2/temporal-distances.html)
